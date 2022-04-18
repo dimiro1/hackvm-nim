@@ -1,16 +1,8 @@
-import std/strformat
-
-type BadAddress* = object of IndexDefect
+type BadAddress* = object of ValueError
   ## Raised if an memory address is out of bounds.
 
-type BadOpcode* = object of Defect
+type BadOpcode* = object of ValueError
   ## Raised if an invalid opcode is given.
-
-proc newBadOpcode(opcode: int): ref BadOpcode =
-  result = newException(BadOpcode, fmt"invalid opcode {opcode:#04X}")
-
-proc newBadAddress(address: int): ref BadAddress =
-  result = newException(BadAddress, fmt"invalid memory address {address:#04X}")
 
 proc u16[T: SomeInteger](i: T): int {.noSideEffect.} =
   result = i and 0xFFFF
@@ -31,31 +23,31 @@ proc loadRom*(c: var Computer, data: seq[int]) =
   for i, d in data:
     c.rom[i] = d
 
-proc readRom(c: Computer, address: int): int =
+proc readRom(c: Computer, address: int): int {.raises: [BadAddress].} =
   try:
     result = c.rom[address].u16
   except IndexDefect:
-    raise newBadAddress(address)
+    raise newException(BadAddress, "invalid memory address")
 
 proc readRam*(c: Computer, address: int): int =
   try:
     result = c.ram[address].u16
   except IndexDefect:
-    raise newBadAddress(address)
+    raise newException(BadAddress, "invalid memory address")
 
-proc readWithCompM(c: Computer, compm: bool): int =
+proc readWithCompM(c: Computer, compm: bool): int {.raises: [BadAddress].} =
   if compm:
     result = c.readRam(c.a)
   else:
     result = c.a
 
-proc writeRam(c: var Computer, address: int, value: int) =
+proc writeRam(c: var Computer, address: int, value: int) {.raises: [BadAddress].} =
   try:
     c.ram[address] = value.u16
   except IndexDefect:
-    raise newBadAddress(address)
+    raise newException(BadAddress, "invalid memory address")
 
-proc step*(c: var Computer) =
+proc step*(c: var Computer) {.raises: [BadOpcode, BadAddress].} =
   let opc = c.readRom(c.pc)
 
   case (opc and 0x8000) shr 15:
@@ -91,7 +83,7 @@ proc step*(c: var Computer) =
         of 0x000: c.d and c.readWithCompM(compm)
         of 0x540: c.d or c.readWithCompM(compm)
         else:
-          raise newBadOpcode(opc)
+          raise newException(BadOpcode, "invalid opcode")
 
       if destm:
         c.writeRam(c.a, aluOut)
@@ -118,7 +110,7 @@ proc step*(c: var Computer) =
       else:
         c.pc += 1
     else:
-      raise newBadOpcode(opc)
+      raise newException(BadOpcode, "invalid opcode")
 
 proc keyUp*(c: var Computer) =
   c.writeRam(0x6000, 0)
@@ -260,6 +252,8 @@ proc main() =
   ])
   for i in (0..5):
     c.step()
+  
+  echo "M[0] = ", c.readRam(0)
 
 when isMainModule:
   main()
