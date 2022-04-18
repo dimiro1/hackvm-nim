@@ -1,0 +1,19 @@
+# ignore files wo extension (posix binaries)
+*
+!*.*
+!*/
+
+# Nim
+nimcache
+testresults
+tests/megatest.nim
+outputGotten.txt
+
+# Windows executables
+*.exe
+*.dll
+
+# Editor
+.vscode
+.idea
+*.iml
